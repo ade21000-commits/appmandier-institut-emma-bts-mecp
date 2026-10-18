@@ -8,6 +8,9 @@ LIEN_PUBLICATION = (
     "https://docs.google.com/spreadsheets/d/e/"
     "2PACX-1vS2BqusEeKXdUnHzR1VEUVuYQGlS0jZY_f1KUeDg0soLilm7xzrUxMAFJvUMJxVY4sjqXQCsyuJ10IT/pub"
 )
+GID_CHAPITRES = "465085677"
+GID_DONNEES = "733959936"
+GID_KPI = "1289976720"
 
 NIVEAUX = {
     "Facile": {
@@ -56,24 +59,52 @@ def charger(gid):
     return pd.read_csv(url_onglet(gid), dtype=str)
 
 
+def charger_chapitres():
+    df = charger(GID_CHAPITRES)
+    return df.dropna(subset=["chapitre"])
+
+
 def en_nombre(texte):
     """'1,5' -> 1.5 ; '3 383,33' -> 3383.33"""
     propre = str(texte).replace(" ", "").replace("\xa0", "").replace(" ", "")
     return float(propre.replace(",", "."))
 
 
+def texte_ou_vide(valeur):
+    return "" if pd.isna(valeur) else str(valeur)
+
+
 def verifier_reponse(reponse_eleve, reponse_attendue, tolerance):
     return abs(reponse_eleve - reponse_attendue) <= tolerance
+
+
+def lignes_du_chapitre(df, numero):
+    return df[df["chapitre"].astype(str).str.strip() == str(numero)]
 
 
 # ---------------------------------------------------------------
 # Affichage d'un chapitre complet
 # ---------------------------------------------------------------
-def afficher_chapitre(numero, titre, question_emma, histoire, gid_donnees, gid_kpi):
+def afficher_chapitre(numero):
     entete()
-    st.header(f"Chapitre {numero} : {titre}")
-    st.subheader(question_emma)
-    st.info(histoire)
+
+    try:
+        df_chapitres = charger_chapitres()
+        df_donnees = lignes_du_chapitre(charger(GID_DONNEES).dropna(subset=["donnee"]), numero)
+        df_kpi = lignes_du_chapitre(charger(GID_KPI).dropna(subset=["kpi"]), numero)
+        infos = lignes_du_chapitre(df_chapitres, numero)
+    except Exception:
+        st.error("Impossible de lire les données du Google Sheet. Réessaie dans un instant.")
+        return
+
+    if infos.empty or df_kpi.empty:
+        st.warning("Ce chapitre n'est pas encore rempli dans le Google Sheet.")
+        return
+
+    infos = infos.iloc[0]
+    st.header(f"Chapitre {numero} : {infos['titre']}")
+    st.subheader(infos["question_emma"])
+    st.info(infos["histoire"])
 
     niveau = st.radio(
         "Choisis ton niveau",
@@ -82,25 +113,14 @@ def afficher_chapitre(numero, titre, question_emma, histoire, gid_donnees, gid_k
         key=f"niveau_ch{numero}",
     )
     regles = NIVEAUX[niveau]
-    st.caption(regles["aide"] + f" Tolérance : ± {regles['tolerance']}")
-
-    try:
-        df_donnees = charger(gid_donnees)
-        df_kpi = charger(gid_kpi)
-    except Exception:
-        st.error("Impossible de lire les données du Google Sheet. Réessaie dans un instant.")
-        return
-
-    df_donnees = df_donnees.dropna(subset=["donnee"])
-    df_kpi = df_kpi.dropna(subset=["kpi"])
+    st.caption(regles["aide"])
 
     with st.expander("Les données d'Emma", expanded=True):
-        tableau = pd.DataFrame(
-            {
-                "Donnée": df_donnees["donnee"].str.replace("_", " ").str.capitalize(),
-                "Valeur": df_donnees["valeur"],
-            }
+        libelles = df_donnees["libelle"].where(
+            df_donnees["libelle"].notna(),
+            df_donnees["donnee"].str.replace("_", " ").str.capitalize(),
         )
+        tableau = pd.DataFrame({"Donnée": libelles.values, "Valeur": df_donnees["valeur"].values})
         st.dataframe(tableau, hide_index=True)
 
     cle_verifie = f"verifie_ch{numero}_{niveau}"
@@ -119,11 +139,15 @@ def afficher_chapitre(numero, titre, question_emma, histoire, gid_donnees, gid_k
             calcul_sans_resultat = str(ligne["calcul_texte"]).rsplit(" = ", 1)[0]
             st.caption(f"Calcul : {calcul_sans_resultat}")
 
+        facteur = en_nombre(ligne["facteur_tolerance"]) if pd.notna(ligne["facteur_tolerance"]) else 1.0
+        tolerance = regles["tolerance"] * facteur
+
         reponse = st.number_input(
             f"Ta réponse ({ligne['unite']})",
             value=None,
             step=0.01,
             format="%.2f",
+            help=f"Marge d'erreur acceptée : ± {tolerance:g}",
             key=f"rep_ch{numero}_{niveau}_{ligne['kpi']}",
         )
 
@@ -131,7 +155,7 @@ def afficher_chapitre(numero, titre, question_emma, histoire, gid_donnees, gid_k
             attendu = en_nombre(ligne["reponse"])
             if reponse is None:
                 st.warning("Pas de réponse.")
-            elif verifier_reponse(reponse, attendu, regles["tolerance"]):
+            elif verifier_reponse(reponse, attendu, tolerance):
                 bonnes += 1
                 st.success("Correct.")
             else:
@@ -139,6 +163,9 @@ def afficher_chapitre(numero, titre, question_emma, histoire, gid_donnees, gid_k
             with st.expander("Voir la correction"):
                 st.write(f"Formule : {ligne['formule_texte']}")
                 st.write(f"Calcul : {ligne['calcul_texte']}")
+                commentaire = texte_ou_vide(ligne["interpretation"])
+                if commentaire:
+                    st.write(commentaire)
         st.write("")
 
     def valider():

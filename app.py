@@ -1,5 +1,5 @@
 import streamlit as st
-from common import init_page, entete
+from common import init_page, entete, charger_chapitres
 
 init_page("Accueil")
 entete()
@@ -22,5 +22,22 @@ st.markdown(
     "- **Difficile** : aucune aide."
 )
 
+PAGES = {
+    "1": "pages/1_Chapitre_1_Le_premier_mois.py",
+    "2": "pages/2_Chapitre_2_Gagner_sa_vie.py",
+    "3": "pages/3_Chapitre_3_Les_clientes.py",
+    "4": "pages/4_Chapitre_4_Operationnel.py",
+    "5": "pages/5_Chapitre_5_Nouvelles_clientes.py",
+    "6": "pages/6_Chapitre_6_Recrutement.py",
+    "7": "pages/7_Chapitre_7_Investissement.py",
+}
+
 st.subheader("Les chapitres")
-st.page_link("pages/1_Chapitre_1_Le_premier_mois.py", label="Chapitre 1 : Le premier mois", icon="💶")
+try:
+    chapitres = charger_chapitres()
+    for _, ligne in chapitres.iterrows():
+        numero = str(ligne["chapitre"]).strip()
+        if numero in PAGES:
+            st.page_link(PAGES[numero], label=f"Chapitre {numero} : {ligne['titre']}")
+except Exception:
+    st.error("Impossible de lire la liste des chapitres dans le Google Sheet. Réessaie dans un instant.")

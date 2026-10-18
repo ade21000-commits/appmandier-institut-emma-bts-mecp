@@ -6,11 +6,11 @@ import streamlit as st
 # ---------------------------------------------------------------
 LIEN_PUBLICATION = (
     "https://docs.google.com/spreadsheets/d/e/"
-    "2PACX-1vS2BqusEeKXdUnHzR1VEUVuYQGlS0jZY_f1KUeDg0soLilm7xzrUxMAFJvUMJxVY4sjqXQCsyuJ10IT/pub"
+    "2PACX-1vTlkaxnmGPX6gc4w6r3pVwJYyZMMNwp0mqjvqoXFdKlWNRQAb1_STj0R-jmlbuan0-K234cQ3raE52Q/pub"
 )
-GID_CHAPITRES = "465085677"
-GID_DONNEES = "733959936"
-GID_KPI = "1289976720"
+GID_CHAPITRES = "1430052139"
+GID_DONNEES = "1075878609"
+GID_KPI = "852366098"
 
 NIVEAUX = {
     "Facile": {
